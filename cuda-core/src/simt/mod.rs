@@ -159,8 +159,10 @@ pub unsafe fn launch_kernel_ex(
     unsafe {
         let base = &mut cluster_attr as *mut _ as *mut u8;
         // id at offset 0
-        (base as *mut u32)
-            .write(cuda_bindings::CUlaunchAttributeID_enum_CU_LAUNCH_ATTRIBUTE_CLUSTER_DIMENSION);
+        (base as *mut u32).write(u32::from_ne_bytes(
+            cuda_bindings::CUlaunchAttributeID_enum_CU_LAUNCH_ATTRIBUTE_CLUSTER_DIMENSION
+                .to_ne_bytes(),
+        ));
         // clusterDim.x/y/z at offsets 8, 12, 16
         let dim_ptr = base.add(8) as *mut u32;
         dim_ptr.write(cluster_dim.0);
@@ -283,8 +285,9 @@ pub unsafe fn launch_kernel_cooperative(
     let mut coop_attr: cuda_bindings::CUlaunchAttribute_st = unsafe { std::mem::zeroed() };
     unsafe {
         let base = &mut coop_attr as *mut _ as *mut u8;
-        (base as *mut u32)
-            .write(cuda_bindings::CUlaunchAttributeID_enum_CU_LAUNCH_ATTRIBUTE_COOPERATIVE);
+        (base as *mut u32).write(u32::from_ne_bytes(
+            cuda_bindings::CUlaunchAttributeID_enum_CU_LAUNCH_ATTRIBUTE_COOPERATIVE.to_ne_bytes(),
+        ));
         let val_ptr = base.add(8) as *mut i32;
         val_ptr.write(1);
     }
@@ -392,16 +395,19 @@ pub unsafe fn launch_kernel_ex_cooperative(
     let mut attrs: [cuda_bindings::CUlaunchAttribute_st; 2] = unsafe { std::mem::zeroed() };
     unsafe {
         let base = &mut attrs[0] as *mut _ as *mut u8;
-        (base as *mut u32)
-            .write(cuda_bindings::CUlaunchAttributeID_enum_CU_LAUNCH_ATTRIBUTE_CLUSTER_DIMENSION);
+        (base as *mut u32).write(u32::from_ne_bytes(
+            cuda_bindings::CUlaunchAttributeID_enum_CU_LAUNCH_ATTRIBUTE_CLUSTER_DIMENSION
+                .to_ne_bytes(),
+        ));
         let dim_ptr = base.add(8) as *mut u32;
         dim_ptr.write(cluster_dim.0);
         dim_ptr.add(1).write(cluster_dim.1);
         dim_ptr.add(2).write(cluster_dim.2);
 
         let base = &mut attrs[1] as *mut _ as *mut u8;
-        (base as *mut u32)
-            .write(cuda_bindings::CUlaunchAttributeID_enum_CU_LAUNCH_ATTRIBUTE_COOPERATIVE);
+        (base as *mut u32).write(u32::from_ne_bytes(
+            cuda_bindings::CUlaunchAttributeID_enum_CU_LAUNCH_ATTRIBUTE_COOPERATIVE.to_ne_bytes(),
+        ));
         let val_ptr = base.add(8) as *mut i32;
         val_ptr.write(1);
     }

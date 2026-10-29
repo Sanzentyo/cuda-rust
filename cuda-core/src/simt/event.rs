@@ -70,7 +70,11 @@ impl CudaContext {
         self.bind_to_thread()?;
         let mut cu_event = MaybeUninit::uninit();
         let cu_event = unsafe {
-            cuda_bindings::cuEventCreate(cu_event.as_mut_ptr(), flags).result()?;
+            cuda_bindings::cuEventCreate(
+                cu_event.as_mut_ptr(),
+                u32::from_ne_bytes(flags.to_ne_bytes()),
+            )
+            .result()?;
             cu_event.assume_init()
         };
         Ok(CudaEvent {

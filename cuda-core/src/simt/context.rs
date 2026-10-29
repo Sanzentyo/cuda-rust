@@ -463,7 +463,9 @@ impl CudaContext {
         if prev == 0 && self.event_tracking.load(Ordering::Relaxed) {
             self.synchronize()?;
         }
-        let flags = cuda_bindings::CUstream_flags_enum_CU_STREAM_NON_BLOCKING;
+        let flags = u32::from_ne_bytes(
+            cuda_bindings::CUstream_flags_enum_CU_STREAM_NON_BLOCKING.to_ne_bytes(),
+        );
         let mut cu_stream = MaybeUninit::uninit();
         let cu_stream = unsafe {
             match priority {
@@ -722,8 +724,11 @@ impl CudaContext {
             )
             .result()?;
             let current = current.assume_init();
-            let new_flags =
-                (current & !cuda_bindings::CUctx_flags_enum_CU_CTX_SCHED_MASK) | policy.to_raw();
+            let new_flags = (current
+                & !u32::from_ne_bytes(
+                    cuda_bindings::CUctx_flags_enum_CU_CTX_SCHED_MASK.to_ne_bytes(),
+                ))
+                | u32::from_ne_bytes(policy.to_raw().to_ne_bytes());
             cuda_bindings::cuDevicePrimaryCtxSetFlags_v2(self.cu_device, new_flags).result()
         }
     }
@@ -744,7 +749,9 @@ impl CudaContext {
                 active.as_mut_ptr(),
             )
             .result()?;
-            Ok(SyncPolicy::from_raw(flags.assume_init()))
+            Ok(SyncPolicy::from_raw(
+                cuda_bindings::CUctx_flags_enum::from_ne_bytes(flags.assume_init().to_ne_bytes()),
+            ))
         }
     }
 
@@ -757,7 +764,9 @@ impl CudaContext {
         if error_state == 0 {
             Ok(())
         } else {
-            Err(DriverError(error_state))
+            Err(DriverError(cuda_bindings::CUresult::from_ne_bytes(
+                error_state.to_ne_bytes(),
+            )))
         }
     }
 
@@ -769,7 +778,8 @@ impl CudaContext {
     /// calls will surface it. A later store overwrites an earlier one.
     pub fn record_err<T>(&self, result: Result<T, DriverError>) {
         if let Err(err) = result {
-            self.error_state.store(err.0, Ordering::Relaxed)
+            self.error_state
+                .store(u32::from_ne_bytes(err.0.to_ne_bytes()), Ordering::Relaxed)
         }
     }
 }

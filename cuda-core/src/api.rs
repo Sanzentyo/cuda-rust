@@ -133,7 +133,7 @@ fn programmatic_launch_attribute() -> cuda_bindings::CUlaunchAttribute_st {
     unsafe {
         let base = (&mut attribute as *mut cuda_bindings::CUlaunchAttribute_st).cast::<u8>();
         base.cast::<u32>().write_unaligned(
-            cuda_bindings::CUlaunchAttributeID_enum_CU_LAUNCH_ATTRIBUTE_PROGRAMMATIC_STREAM_SERIALIZATION
+            u32::from_ne_bytes(cuda_bindings::CUlaunchAttributeID_enum_CU_LAUNCH_ATTRIBUTE_PROGRAMMATIC_STREAM_SERIALIZATION.to_ne_bytes())
         );
         base.add(8).cast::<i32>().write_unaligned(1);
     }
@@ -152,7 +152,7 @@ mod pdl_attribute_tests {
                 std::mem::size_of_val(&attribute),
             )
         };
-        let id = cuda_bindings::CUlaunchAttributeID_enum_CU_LAUNCH_ATTRIBUTE_PROGRAMMATIC_STREAM_SERIALIZATION;
+        let id = u32::from_ne_bytes(cuda_bindings::CUlaunchAttributeID_enum_CU_LAUNCH_ATTRIBUTE_PROGRAMMATIC_STREAM_SERIALIZATION.to_ne_bytes());
         assert_eq!(&bytes[..4], &id.to_ne_bytes());
         assert_eq!(&bytes[8..12], &1i32.to_ne_bytes());
         assert!(bytes[4..8].iter().chain(&bytes[12..]).all(|b| *b == 0));
