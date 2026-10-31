@@ -30,21 +30,20 @@ use crate::render::families::{
     register_mma_attr_variants, register_mma_compat_op_type, register_mma_constraints,
     register_mma_extra_operand_count, register_mma_fragment_counts, register_mma_result_variant,
     register_mma_template, register_mmas, scalar_arithmetic_contract,
-    scalar_arithmetic_format_attr, scalar_arithmetic_llvm_mechanism,
+    scalar_arithmetic_format_attr, scalar_arithmetic_llvm_mechanism, scalar_arithmetic_mode_attr,
     scalar_arithmetic_operation_attr, scalar_arithmetic_ptx_mnemonic,
-    scalar_arithmetic_rounding_attr, scalar_arithmetic_saturation_attr,
-    scalar_arithmetic_subnormal_attr, scalar_arithmetics, scalar_conversion_ptx_mnemonic,
-    scalar_conversion_rounding_attr, scalar_conversion_saturation_attr, scalar_conversions,
-    scalar_math_contract, scalar_math_format_attr, scalar_math_llvm_mechanism,
-    scalar_math_operation_attr, scalar_math_precision_attr, scalar_math_ptx_mnemonic,
-    scalar_math_subnormal_attr, scalar_maths, sparse_mma_attr_variants, sparse_mma_constraints,
-    sparse_mma_fragment_counts, sparse_mma_result_variant, sparse_mma_template, sparse_mmas,
-    special_register_asm_kind, special_register_backend_mechanism,
-    special_register_inline_template, special_register_output_constraint, sregs, stmatrices,
-    stmatrix_variant, sync_intrinsics, tcgen05_inline_asm, tcgen05_intrinsics,
-    tcgen05_mma_intrinsics, tcgen05_non_mma_intrinsics, threadfence_ptx_level, tma_intrinsics,
-    vote_intrinsics, warp_barriers, warp_matches, warp_shuffles, wgmma_control_template,
-    wgmma_controls,
+    scalar_arithmetic_saturation_attr, scalar_arithmetic_subnormal_attr, scalar_arithmetics,
+    scalar_conversion_ptx_mnemonic, scalar_conversion_rounding_attr,
+    scalar_conversion_saturation_attr, scalar_conversions, scalar_math_contract,
+    scalar_math_format_attr, scalar_math_llvm_mechanism, scalar_math_operation_attr,
+    scalar_math_precision_attr, scalar_math_ptx_mnemonic, scalar_math_subnormal_attr, scalar_maths,
+    sparse_mma_attr_variants, sparse_mma_constraints, sparse_mma_fragment_counts,
+    sparse_mma_result_variant, sparse_mma_template, sparse_mmas, special_register_asm_kind,
+    special_register_backend_mechanism, special_register_inline_template,
+    special_register_output_constraint, sregs, stmatrices, stmatrix_variant, sync_intrinsics,
+    tcgen05_inline_asm, tcgen05_intrinsics, tcgen05_mma_intrinsics, tcgen05_non_mma_intrinsics,
+    threadfence_ptx_level, tma_intrinsics, vote_intrinsics, warp_barriers, warp_matches,
+    warp_shuffles, wgmma_control_template, wgmma_controls,
 };
 use std::fmt::Write as _;
 use std::path::PathBuf;
@@ -556,7 +555,7 @@ fn scalar_arithmetic_impls(catalog: &CatalogFile) -> String {
     let mut output = String::new();
     if scalar_arithmetics(catalog).next().is_some() {
         output.push_str(
-            "#[op_interface_impl]\nimpl MirToLlvmConversion for ScalarArithmeticOp {\n    fn convert(\n        &self,\n        ctx: &mut Context,\n        rewriter: &mut DialectConversionRewriter,\n        _operands_info: &OperandsInfo,\n    ) -> Result<()> {\n        let recipe = match (\n            self.get_attr_nvvm_scalar_arithmetic_format(ctx).as_deref(),\n            self.get_attr_nvvm_scalar_arithmetic_operation(ctx).as_deref(),\n            self.get_attr_nvvm_scalar_arithmetic_rounding(ctx).as_deref(),\n            self.get_attr_nvvm_scalar_arithmetic_subnormal(ctx).as_deref(),\n            self.get_attr_nvvm_scalar_arithmetic_saturation(ctx).as_deref(),\n        ) {\n",
+            "#[op_interface_impl]\nimpl MirToLlvmConversion for ScalarArithmeticOp {\n    fn convert(\n        &self,\n        ctx: &mut Context,\n        rewriter: &mut DialectConversionRewriter,\n        _operands_info: &OperandsInfo,\n    ) -> Result<()> {\n        let recipe = match (\n            self.get_attr_nvvm_scalar_arithmetic_format(ctx).as_deref(),\n            self.get_attr_nvvm_scalar_arithmetic_operation(ctx).as_deref(),\n            self.get_attr_nvvm_scalar_arithmetic_mode(ctx).as_deref(),\n            self.get_attr_nvvm_scalar_arithmetic_subnormal(ctx).as_deref(),\n            self.get_attr_nvvm_scalar_arithmetic_saturation(ctx).as_deref(),\n        ) {\n",
         );
         for record in scalar_arithmetics(catalog) {
             writeln!(
@@ -564,7 +563,7 @@ fn scalar_arithmetic_impls(catalog: &CatalogFile) -> String {
                 "            (Some(&{}), Some(&{}), Some(&{}), Some(&{}), Some(&{})) => ({:?}, {:?}, {}, {}),",
                 scalar_arithmetic_format_attr(record),
                 scalar_arithmetic_operation_attr(record),
-                scalar_arithmetic_rounding_attr(record),
+                scalar_arithmetic_mode_attr(record),
                 scalar_arithmetic_subnormal_attr(record),
                 scalar_arithmetic_saturation_attr(record),
                 record.llvm_identifier(),

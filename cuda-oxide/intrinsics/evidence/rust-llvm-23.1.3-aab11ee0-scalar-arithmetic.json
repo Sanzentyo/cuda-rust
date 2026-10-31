@@ -454,5 +454,69 @@
         }
       }
     }
+  ],
+  "records": [{
+  "id": "div_approx_ftz_f32",
+  "source_record": "int_nvvm_div_approx_ftz_f",
+  "llvm_symbol": "llvm.nvvm.div.approx.ftz.f",
+  "llvm_arguments": [
+    "f32",
+    "f32"
+  ],
+  "llvm_results": [
+    "f32"
+  ],
+  "target_triple": "nvptx64-nvidia-cuda",
+  "gpu_target": "sm_80",
+  "ptx_feature": "+ptx70",
+  "status": "validated",
+  "runtime_validation": "unexecuted",
+  "expected_ptx": {
+    "mnemonic": "div",
+    "modifiers": [
+      "approx",
+      "ftz",
+      "f32"
+    ],
+    "operands": [
+      {
+        "kind": "register"
+      },
+      {
+        "kind": "register"
+      },
+      {
+        "kind": "register"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "targets": [
+        "sm_80",
+        "ptx70"
+      ],
+      "representation": "LLVM IR inline PTX to NVPTX",
+      "stage": "backend_codegen",
+      "mechanism": "inline_ptx",
+      "outcome": "succeeded",
+      "detail": "LLVM IR SHA-256 d3daf8576f19b63c50f195e53e15309814233166890577d60ea5885f7c3ed2a0 generated PTX SHA-256 4f99d091b6f9ac2fb84dff4f59d406407df8de43174810228561005932e69f40 with the exact instruction."
+    },
+    {
+      "targets": [
+        "sm_80",
+        "ptx70"
+      ],
+      "representation": "Assembled generated PTX",
+      "stage": "ptx_assembly",
+      "mechanism": "inline_ptx",
+      "outcome": "succeeded",
+      "artifact_kind": "cubin",
+      "detail": "Cubin SHA-256 6bcec1b1eab13da703fdade053704aa6ab00591a1b38dd7daf48ac0dec541df2.",
+      "tool_path": "ptxas",
+      "tool_version": "Cuda compilation tools, release 13.3, V13.3.33",
+      "tool_sha256": "7fdd01a4cf50e30746da98989c9272a907f491e6fd7fecfda14642e4375f88fb"
+    }
   ]
+} ]
 }

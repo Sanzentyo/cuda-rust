@@ -11,8 +11,8 @@ use crate::render::families::{
     extended_minmax_xorsign_abs_attr, integer_minmax_ptx_mnemonic, integer_minmaxes,
     packed_alu_ptx_mnemonic, packed_alu_width, packed_alus, packed_conversion_element,
     packed_conversion_result_width, packed_conversion_source, packed_conversion_source_width,
-    packed_conversions, scalar_arithmetic_format_attr, scalar_arithmetic_operation_attr,
-    scalar_arithmetic_rounding_attr, scalar_arithmetic_saturation_attr,
+    packed_conversions, scalar_arithmetic_format_attr, scalar_arithmetic_mode_attr,
+    scalar_arithmetic_operation_attr, scalar_arithmetic_saturation_attr,
     scalar_arithmetic_subnormal_attr, scalar_arithmetics, scalar_conversion_rounding_attr,
     scalar_conversion_saturation_attr, scalar_conversions, scalar_math_format_attr,
     scalar_math_operation_attr, scalar_math_precision_attr, scalar_math_subnormal_attr,
@@ -600,9 +600,9 @@ pub enum ScalarArithmeticFormatAttr { F32, F64 }
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
 pub enum ScalarArithmeticOperationAttr { Mul, Div, Fma, Add }
 
-#[pliron_attr(name = "nvvm.scalar_arithmetic_rounding", format, verifier = "succ")]
+#[pliron_attr(name = "nvvm.scalar_arithmetic_mode", format, verifier = "succ")]
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
-pub enum ScalarArithmeticRoundingAttr { Rn, Rz, Rm, Rp }
+pub enum ScalarArithmeticModeAttr { Approx, Rn, Rz, Rm, Rp }
 
 #[pliron_attr(name = "nvvm.scalar_arithmetic_subnormal", format, verifier = "succ")]
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
@@ -620,7 +620,7 @@ pub enum ScalarArithmeticSaturationAttr { None, Sat }
     attributes = (
         nvvm_scalar_arithmetic_format: ScalarArithmeticFormatAttr,
         nvvm_scalar_arithmetic_operation: ScalarArithmeticOperationAttr,
-        nvvm_scalar_arithmetic_rounding: ScalarArithmeticRoundingAttr,
+        nvvm_scalar_arithmetic_mode: ScalarArithmeticModeAttr,
         nvvm_scalar_arithmetic_subnormal: ScalarArithmeticSubnormalAttr,
         nvvm_scalar_arithmetic_saturation: ScalarArithmeticSaturationAttr
     )
@@ -635,7 +635,7 @@ impl ScalarArithmeticOp {
         operands: Vec<Value>,
         format: ScalarArithmeticFormatAttr,
         operation: ScalarArithmeticOperationAttr,
-        rounding: ScalarArithmeticRoundingAttr,
+        mode: ScalarArithmeticModeAttr,
         subnormal: ScalarArithmeticSubnormalAttr,
         saturation: ScalarArithmeticSaturationAttr,
     ) -> Ptr<Operation> {
@@ -654,7 +654,7 @@ impl ScalarArithmeticOp {
         let this = Self { op };
         this.set_attr_nvvm_scalar_arithmetic_format(ctx, format);
         this.set_attr_nvvm_scalar_arithmetic_operation(ctx, operation);
-        this.set_attr_nvvm_scalar_arithmetic_rounding(ctx, rounding);
+        this.set_attr_nvvm_scalar_arithmetic_mode(ctx, mode);
         this.set_attr_nvvm_scalar_arithmetic_subnormal(ctx, subnormal);
         this.set_attr_nvvm_scalar_arithmetic_saturation(ctx, saturation);
         this.get_operation()
@@ -670,8 +670,8 @@ impl Verify for ScalarArithmeticOp {
         let Some(operation) = self.get_attr_nvvm_scalar_arithmetic_operation(ctx) else {
             return verify_err!(op.loc(), "nvvm.scalar_arithmetic requires an operation");
         };
-        let Some(rounding) = self.get_attr_nvvm_scalar_arithmetic_rounding(ctx) else {
-            return verify_err!(op.loc(), "nvvm.scalar_arithmetic requires rounding");
+        let Some(mode) = self.get_attr_nvvm_scalar_arithmetic_mode(ctx) else {
+            return verify_err!(op.loc(), "nvvm.scalar_arithmetic requires a mode");
         };
         let Some(subnormal) = self.get_attr_nvvm_scalar_arithmetic_subnormal(ctx) else {
             return verify_err!(op.loc(), "nvvm.scalar_arithmetic requires a subnormal mode");
@@ -680,7 +680,7 @@ impl Verify for ScalarArithmeticOp {
             return verify_err!(op.loc(), "nvvm.scalar_arithmetic requires saturation");
         };
         let admitted = matches!(
-            (&*format, &*operation, &*rounding, &*subnormal, &*saturation),
+            (&*format, &*operation, &*mode, &*subnormal, &*saturation),
 "##,
     );
     for (index, record) in scalar_arithmetics(catalog).enumerate() {
@@ -692,7 +692,7 @@ impl Verify for ScalarArithmeticOp {
             "            ({}, {}, {}, {}, {})",
             scalar_arithmetic_format_attr(record),
             scalar_arithmetic_operation_attr(record),
-            scalar_arithmetic_rounding_attr(record),
+            scalar_arithmetic_mode_attr(record),
             scalar_arithmetic_subnormal_attr(record),
             scalar_arithmetic_saturation_attr(record),
         )
@@ -732,7 +732,7 @@ impl Verify for ScalarArithmeticOp {
 pub(super) fn register(ctx: &mut Context) {
     ScalarArithmeticFormatAttr::register(ctx);
     ScalarArithmeticOperationAttr::register(ctx);
-    ScalarArithmeticRoundingAttr::register(ctx);
+    ScalarArithmeticModeAttr::register(ctx);
     ScalarArithmeticSubnormalAttr::register(ctx);
     ScalarArithmeticSaturationAttr::register(ctx);
     ScalarArithmeticOp::register(ctx);

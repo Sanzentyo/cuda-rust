@@ -5,15 +5,15 @@
 
 use crate::extract::{IMPORTED_SCHEMA, read_upstream_lock};
 use crate::model::{
-    AbiLedgerFile, BackendLoweringMechanism, CatalogBackend, CatalogFile,
+    AbiLedgerFile, BackendLoweringMechanism, CatalogBackend, CatalogBackendLowering, CatalogFile,
     CatalogHardwareAlternative, CatalogHardwareTarget, CatalogInputs, CatalogSource,
     CatalogTargetRequirement, ExecutionControlOperation, ImportedFile, ImportedIntrinsic,
     IntrinsicBackend, IntrinsicSource, OverlayFile, OverlayIntrinsic, PtxVersion,
 };
 #[cfg(test)]
 use crate::model::{
-    CatalogBackendLowering, ClcAdmission, ClcOperation, RuntimeValidation, Tcgen05Admission,
-    Tcgen05LdAdmissionVariant, Tcgen05Operation, Tcgen05StAdmissionVariant, TmaAdmission,
+    ClcAdmission, ClcOperation, RuntimeValidation, Tcgen05Admission, Tcgen05LdAdmissionVariant,
+    Tcgen05Operation, Tcgen05StAdmissionVariant, TmaAdmission,
 };
 use crate::util::{read_json, sha256_file};
 #[cfg(test)]
@@ -622,7 +622,18 @@ pub(crate) fn resolve_candidate(
             gpu_target: gpu_target.into(),
             ptx_feature: ptx_feature.into(),
         },
-        Vec::new(),
+        vec![CatalogBackendLowering {
+            backend: IntrinsicBackend::LlvmNvptx,
+            mechanism,
+            evidence_profile: "candidate-comparison".into(),
+            target: target.clone(),
+            version: backend_version.into(),
+            sha256: backend_sha256.into(),
+            artifact_path: None,
+            build_id_prefix: None,
+            status: "candidate".into(),
+            stages: vec![],
+        }],
         base.overlay.intrinsic_abi,
     )?;
     Ok(CandidateResolution {

@@ -347,7 +347,7 @@ pub(super) fn dialect_nvvm_ops_import_candidates(catalog: &CatalogFile) -> Vec<S
         "ScalarArithmeticFormatAttr",
         "ScalarArithmeticOp",
         "ScalarArithmeticOperationAttr",
-        "ScalarArithmeticRoundingAttr",
+        "ScalarArithmeticModeAttr",
         "ScalarArithmeticSaturationAttr",
         "ScalarArithmeticSubnormalAttr",
         "ScalarConversionOp",

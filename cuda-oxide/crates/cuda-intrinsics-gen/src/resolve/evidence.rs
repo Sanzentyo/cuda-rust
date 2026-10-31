@@ -928,6 +928,26 @@ pub(super) fn validate_scalar_arithmetic_backend_evidence(
             policy.id
         ),
         (IntrinsicBackend::LlvmNvptx, BackendLoweringMechanism::InlinePtx) => {
+            if policy
+                .scalar_arithmetic
+                .as_ref()
+                .is_some_and(|a| a.mode == crate::model::ScalarArithmeticMode::Approximate)
+            {
+                ensure!(
+                    record.resolved_llvm_symbol.is_none()
+                        && record.concrete_llvm_arguments.is_empty()
+                        && record.concrete_llvm_results.is_empty()
+                        && record.declaration_attributes_canonicalized.is_none()
+                        && !record
+                            .stages
+                            .iter()
+                            .any(|stage| stage.mechanism
+                                == Some(BackendLoweringMechanism::TypedNvvm)),
+                    "{} inline approximate route must not claim typed declaration evidence",
+                    policy.id
+                );
+                return Ok(());
+            }
             validate_typed_llvm_evidence(policy, record)?;
             ensure!(
                 successful_stage(

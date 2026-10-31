@@ -6,8 +6,8 @@
 use crate::model::{
     BackendLoweringMechanism, ImportedIntrinsic, IntrinsicBackend, OverlayBackendLowering,
     OverlayIntrinsic, RuntimeValidation, ScalarArithmetic, ScalarArithmeticAdmission,
-    ScalarArithmeticFormat, ScalarArithmeticOperation, ScalarArithmeticRounding,
-    ScalarArithmeticSaturation, ScalarArithmeticSubnormal,
+    ScalarArithmeticFormat, ScalarArithmeticMode, ScalarArithmeticOperation,
+    ScalarArithmeticRounding, ScalarArithmeticSaturation, ScalarArithmeticSubnormal,
 };
 use crate::ptx::{InstructionPattern, OperandPattern};
 use anyhow::{Context, Result, ensure};
@@ -35,7 +35,7 @@ pub(in crate::resolve) struct ScalarArithmeticRecipe {
 pub(in crate::resolve) type ScalarArithmeticVariant = (
     ScalarArithmeticFormat,
     ScalarArithmeticOperation,
-    ScalarArithmeticRounding,
+    ScalarArithmeticMode,
     ScalarArithmeticSubnormal,
     ScalarArithmeticSaturation,
 );
@@ -47,8 +47,8 @@ pub(in crate::resolve) fn canonical_scalar_arithmetic_variants() -> Vec<ScalarAr
     use ScalarArithmeticSaturation::{None, Sat};
     use ScalarArithmeticSubnormal::{Ftz, Preserve};
 
-    let roundings = [Rn, Rz, Rm, Rp];
-    let mut variants = Vec::with_capacity(64);
+    let roundings = [Rn, Rz, Rm, Rp].map(ScalarArithmeticMode::Rounded);
+    let mut variants = Vec::with_capacity(65);
     for operation in [Mul, Div, Fma] {
         for rounding in roundings {
             variants.push((F64, operation, rounding, Preserve, None));
@@ -75,6 +75,7 @@ pub(in crate::resolve) fn canonical_scalar_arithmetic_variants() -> Vec<ScalarAr
         variants.push((F32, Add, rounding, Preserve, Sat));
         variants.push((F32, Add, rounding, Ftz, Sat));
     }
+    variants.push((F32, Div, ScalarArithmeticMode::Approximate, Ftz, None));
     variants
 }
 
@@ -98,14 +99,15 @@ pub(in crate::resolve) fn scalar_arithmetic_operation_name(
     }
 }
 
-pub(in crate::resolve) fn scalar_arithmetic_rounding_name(
-    rounding: ScalarArithmeticRounding,
+pub(in crate::resolve) fn scalar_arithmetic_mode_name(
+    rounding: ScalarArithmeticMode,
 ) -> &'static str {
     match rounding {
-        ScalarArithmeticRounding::Rn => "rn",
-        ScalarArithmeticRounding::Rz => "rz",
-        ScalarArithmeticRounding::Rm => "rm",
-        ScalarArithmeticRounding::Rp => "rp",
+        ScalarArithmeticMode::Approximate => "approx",
+        ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rn) => "rn",
+        ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rz) => "rz",
+        ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rm) => "rm",
+        ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rp) => "rp",
     }
 }
 
@@ -117,7 +119,7 @@ pub(in crate::resolve) fn scalar_arithmetic_recipe(
     }
     let (format, operation, rounding, subnormal, saturation) = variant;
     let operation_name = scalar_arithmetic_operation_name(operation);
-    let rounding_name = scalar_arithmetic_rounding_name(rounding);
+    let rounding_name = scalar_arithmetic_mode_name(rounding);
     let format_name = scalar_arithmetic_format_name(format);
     let source_format = match format {
         ScalarArithmeticFormat::F32 => "f",
@@ -249,7 +251,7 @@ pub(in crate::resolve) fn expand_scalar_arithmetic_admission(
             (
                 variant.format,
                 variant.operation,
-                variant.rounding,
+                variant.mode,
                 variant.subnormal,
                 variant.saturation,
             )
@@ -257,7 +259,7 @@ pub(in crate::resolve) fn expand_scalar_arithmetic_admission(
         .collect::<Vec<_>>();
     ensure!(
         actual == expected,
-        "compact scalar-arithmetic admission must list the canonical 64 variants"
+        "compact scalar-arithmetic admission must list the canonical variants"
     );
 
     admission
@@ -268,7 +270,7 @@ pub(in crate::resolve) fn expand_scalar_arithmetic_admission(
             let identity = (
                 variant.format,
                 variant.operation,
-                variant.rounding,
+                variant.mode,
                 variant.subnormal,
                 variant.saturation,
             );
@@ -288,11 +290,15 @@ pub(in crate::resolve) fn scalar_arithmetic_overlay_record(
     let (format, operation, rounding, subnormal, saturation) = variant;
     let rust_arguments = vec![recipe.rust_type.into(); recipe.argument_count];
     let ptx_operands = vec![OperandPattern::Register; recipe.argument_count + 1];
-    let summary = format!(
-        "Computes scalar {} with explicit {} rounding.",
-        scalar_arithmetic_operation_name(operation),
-        scalar_arithmetic_rounding_name(rounding)
-    );
+    let summary = if rounding == ScalarArithmeticMode::Approximate {
+        "Computes approximate division, not correctly rounded. Subnormal inputs and outputs flush to sign-preserving zero. For finite denominators with magnitude above 2^126, the result is sign-preserving zero; an infinite numerator produces NaN.".to_owned()
+    } else {
+        format!(
+            "Computes scalar {} with explicit {} rounding.",
+            scalar_arithmetic_operation_name(operation),
+            scalar_arithmetic_mode_name(rounding)
+        )
+    };
     Ok(OverlayIntrinsic {
         id: recipe.id.clone(),
         abi_id: abi_id.into(),
@@ -343,6 +349,10 @@ pub(in crate::resolve) fn scalar_arithmetic_overlay_record(
         .map(|(backend, evidence_profile)| OverlayBackendLowering {
             backend,
             mechanism: match backend {
+                IntrinsicBackend::LlvmNvptx if rounding == ScalarArithmeticMode::Approximate => {
+                    // This imported declaration has no direct selection; use the reviewed instruction.
+                    BackendLoweringMechanism::InlinePtx
+                }
                 IntrinsicBackend::LlvmNvptx if saturation == ScalarArithmeticSaturation::Sat => {
                     // LLVM 21 has no typed intrinsic for these LLVM 22 forms.
                     BackendLoweringMechanism::InlinePtx
@@ -371,7 +381,7 @@ pub(in crate::resolve) fn scalar_arithmetic_overlay_record(
         scalar_arithmetic: Some(ScalarArithmetic {
             format,
             operation,
-            rounding,
+            mode: rounding,
             subnormal,
             saturation,
             runtime_validation: admission.runtime_validation,
@@ -419,7 +429,7 @@ pub(in crate::resolve) fn validate_scalar_arithmetic_policy(
     let variant = (
         arithmetic.format,
         arithmetic.operation,
-        arithmetic.rounding,
+        arithmetic.mode,
         arithmetic.subnormal,
         arithmetic.saturation,
     );
@@ -456,41 +466,48 @@ pub(in crate::resolve) fn validate_scalar_arithmetic_policy(
         "{} imported scalar-arithmetic properties changed",
         policy.id
     );
-    let direct = declaration
-        .selections
-        .first()
-        .with_context(|| format!("{} has no imported scalar selection", policy.id))?;
-    ensure!(
-        direct.source_record == recipe.selection_record
-            && direct.asm == recipe.selection_asm
-            && direct.predicates.is_empty()
-            && direct.constraints.is_empty(),
-        "{} direct scalar-arithmetic selection changed",
-        policy.id
-    );
-    if arithmetic.operation == ScalarArithmeticOperation::Add {
-        let rounding = scalar_arithmetic_rounding_name(arithmetic.rounding);
-        let source_modifiers = [
-            Some(rounding),
-            (arithmetic.subnormal == ScalarArithmeticSubnormal::Ftz).then_some("ftz"),
-            (arithmetic.saturation == ScalarArithmeticSaturation::Sat).then_some("sat"),
-        ]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .join("_");
-        let mut expected = Vec::new();
-        if arithmetic.format == ScalarArithmeticFormat::F32
-            && arithmetic.subnormal == ScalarArithmeticSubnormal::Preserve
-        {
-            let saturation = if arithmetic.saturation == ScalarArithmeticSaturation::Sat {
-                "_sat"
-            } else {
-                ""
-            };
-            for instruction in ["ADD", "SUB"] {
-                for input_format in ["bf16", "f16"] {
-                    expected.push((
+    if arithmetic.mode == ScalarArithmeticMode::Approximate {
+        ensure!(
+            declaration.selections.is_empty(),
+            "{} gained an imported selection",
+            policy.id
+        );
+    } else {
+        let direct = declaration
+            .selections
+            .first()
+            .with_context(|| format!("{} has no imported scalar selection", policy.id))?;
+        ensure!(
+            direct.source_record == recipe.selection_record
+                && direct.asm == recipe.selection_asm
+                && direct.predicates.is_empty()
+                && direct.constraints.is_empty(),
+            "{} direct scalar-arithmetic selection changed",
+            policy.id
+        );
+        if arithmetic.operation == ScalarArithmeticOperation::Add {
+            let rounding = scalar_arithmetic_mode_name(arithmetic.mode);
+            let source_modifiers = [
+                Some(rounding),
+                (arithmetic.subnormal == ScalarArithmeticSubnormal::Ftz).then_some("ftz"),
+                (arithmetic.saturation == ScalarArithmeticSaturation::Sat).then_some("sat"),
+            ]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .join("_");
+            let mut expected = Vec::new();
+            if arithmetic.format == ScalarArithmeticFormat::F32
+                && arithmetic.subnormal == ScalarArithmeticSubnormal::Preserve
+            {
+                let saturation = if arithmetic.saturation == ScalarArithmeticSaturation::Sat {
+                    "_sat"
+                } else {
+                    ""
+                };
+                for instruction in ["ADD", "SUB"] {
+                    for input_format in ["bf16", "f16"] {
+                        expected.push((
                         format!(
                             "INT_NVVM_MIXED_{instruction}_{rounding}{saturation}_f32_{input_format}"
                         ),
@@ -508,91 +525,94 @@ pub(in crate::resolve) fn validate_scalar_arithmetic_policy(
                             "Subtarget->getPTXVersion() >= 86".to_owned(),
                         ],
                     ));
+                    }
                 }
             }
-        }
-        let source_format = match arithmetic.format {
-            ScalarArithmeticFormat::F32 => "F",
-            ScalarArithmeticFormat::F64 => "D",
-        };
-        expected.push((
-            format!("INT_NVVM_SUB_{source_modifiers}_{source_format}"),
-            format!("sub.{} \t$dst, $a, $b;", recipe.ptx_modifiers.join(".")),
-            Vec::new(),
-        ));
-        ensure!(
-            declaration.selections.len() == expected.len() + 1,
-            "{} must retain one direct add and the reviewed non-add alternatives",
-            policy.id
-        );
-        for (selection, (source_record, asm, predicates)) in
-            declaration.selections[1..].iter().zip(expected)
+            let source_format = match arithmetic.format {
+                ScalarArithmeticFormat::F32 => "F",
+                ScalarArithmeticFormat::F64 => "D",
+            };
+            expected.push((
+                format!("INT_NVVM_SUB_{source_modifiers}_{source_format}"),
+                format!("sub.{} \t$dst, $a, $b;", recipe.ptx_modifiers.join(".")),
+                Vec::new(),
+            ));
+            ensure!(
+                declaration.selections.len() == expected.len() + 1,
+                "{} must retain one direct add and the reviewed non-add alternatives",
+                policy.id
+            );
+            for (selection, (source_record, asm, predicates)) in
+                declaration.selections[1..].iter().zip(expected)
+            {
+                ensure!(
+                    selection.source_record == source_record
+                        && selection.asm == asm
+                        && selection.predicates == predicates
+                        && selection.constraints.is_empty(),
+                    "{} non-add scalar selection changed",
+                    policy.id
+                );
+            }
+        } else if arithmetic.format == ScalarArithmeticFormat::F32
+            && arithmetic.operation == ScalarArithmeticOperation::Fma
+            && arithmetic.subnormal == ScalarArithmeticSubnormal::Preserve
         {
             ensure!(
-                selection.source_record == source_record
-                    && selection.asm == asm
-                    && selection.predicates == predicates
-                    && selection.constraints.is_empty(),
-                "{} non-add scalar selection changed",
+                declaration.selections.len() == 3,
+                "{} must retain one direct and two mixed-input selections",
                 policy.id
             );
-        }
-    } else if arithmetic.format == ScalarArithmeticFormat::F32
-        && arithmetic.operation == ScalarArithmeticOperation::Fma
-        && arithmetic.subnormal == ScalarArithmeticSubnormal::Preserve
-    {
-        ensure!(
-            declaration.selections.len() == 3,
-            "{} must retain one direct and two mixed-input selections",
-            policy.id
-        );
-        let rounding = scalar_arithmetic_rounding_name(arithmetic.rounding);
-        let saturation = if arithmetic.saturation == ScalarArithmeticSaturation::Sat {
-            "_sat"
+            let rounding = scalar_arithmetic_mode_name(arithmetic.mode);
+            let saturation = if arithmetic.saturation == ScalarArithmeticSaturation::Sat {
+                "_sat"
+            } else {
+                ""
+            };
+            for (selection, input_format) in declaration.selections[1..].iter().zip(["bf16", "f16"])
+            {
+                ensure!(
+                    selection.source_record
+                        == format!("INT_NVVM_MIXED_FMA_{rounding}{saturation}_f32_{input_format}")
+                        && selection.asm
+                            == format!(
+                                "fma.{rounding}{}.f32.{input_format} \t$dst, $a, $b, $c;",
+                                if arithmetic.saturation == ScalarArithmeticSaturation::Sat {
+                                    ".sat"
+                                } else {
+                                    ""
+                                }
+                            )
+                        && selection.predicates
+                            == [
+                                "Subtarget->getSmVersion() >= 100",
+                                "Subtarget->getPTXVersion() >= 86",
+                            ]
+                        && selection.constraints.is_empty(),
+                    "{} mixed-input scalar-arithmetic selection changed",
+                    policy.id
+                );
+            }
         } else {
-            ""
-        };
-        for (selection, input_format) in declaration.selections[1..].iter().zip(["bf16", "f16"]) {
             ensure!(
-                selection.source_record
-                    == format!("INT_NVVM_MIXED_FMA_{rounding}{saturation}_f32_{input_format}")
-                    && selection.asm
-                        == format!(
-                            "fma.{rounding}{}.f32.{input_format} \t$dst, $a, $b, $c;",
-                            if arithmetic.saturation == ScalarArithmeticSaturation::Sat {
-                                ".sat"
-                            } else {
-                                ""
-                            }
-                        )
-                    && selection.predicates
-                        == [
-                            "Subtarget->getSmVersion() >= 100",
-                            "Subtarget->getPTXVersion() >= 86",
-                        ]
-                    && selection.constraints.is_empty(),
-                "{} mixed-input scalar-arithmetic selection changed",
+                declaration.selections.len() == 1,
+                "{} gained an unreviewed scalar-arithmetic selection",
                 policy.id
             );
         }
-    } else {
+        let mut selected = Vec::new();
+        for selection in &declaration.selections {
+            if selection_matches_policy(policy, selection)? {
+                selected.push(selection);
+            }
+        }
         ensure!(
-            declaration.selections.len() == 1,
-            "{} gained an unreviewed scalar-arithmetic selection",
+            selected.len() == 1 && selected[0].source_record == recipe.selection_record,
+            "{} must select only its direct scalar arithmetic instruction",
             policy.id
         );
+        validate_selected_target_predicates(policy, direct)?;
     }
-    let mut selected = Vec::new();
-    for selection in &declaration.selections {
-        if selection_matches_policy(policy, selection)? {
-            selected.push(selection);
-        }
-    }
-    ensure!(
-        selected.len() == 1 && selected[0].source_record == recipe.selection_record,
-        "{} must select only its direct scalar arithmetic instruction",
-        policy.id
-    );
     ensure!(
         policy.rust_module == "float"
             && policy.rust_name == recipe.id
@@ -634,7 +654,9 @@ pub(in crate::resolve) fn validate_scalar_arithmetic_policy(
         "{} expected scalar-arithmetic PTX changed",
         policy.id
     );
-    let llvm_mechanism = if arithmetic.saturation == ScalarArithmeticSaturation::Sat {
+    let llvm_mechanism = if arithmetic.saturation == ScalarArithmeticSaturation::Sat
+        || arithmetic.mode == ScalarArithmeticMode::Approximate
+    {
         BackendLoweringMechanism::InlinePtx
     } else {
         BackendLoweringMechanism::TypedNvvm
@@ -660,7 +682,6 @@ pub(in crate::resolve) fn validate_scalar_arithmetic_policy(
         "{} has the wrong reviewed scalar-arithmetic backend routes",
         policy.id
     );
-    validate_selected_target_predicates(policy, direct)?;
     ensure_no_other_family_contract(policy, "scalar arithmetic")?;
     Ok(())
 }

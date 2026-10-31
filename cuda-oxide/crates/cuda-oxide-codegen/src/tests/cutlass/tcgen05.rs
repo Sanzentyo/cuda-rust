@@ -1049,7 +1049,7 @@ mod cutlass_attention_numeric_pack_compiles_module {
             a[..3].to_vec(),
             ScalarArithmeticFormatAttr::F32,
             ScalarArithmeticOperationAttr::Fma,
-            ScalarArithmeticRoundingAttr::Rn,
+            ScalarArithmeticModeAttr::Rn,
             ScalarArithmeticSubnormalAttr::Preserve,
             ScalarArithmeticSaturationAttr::None,
         );

@@ -40,6 +40,16 @@ const HALF_MINMAX_RESULTS: usize = 12;
 mod kernels {
     use super::*;
 
+    /// Keeps both public paths for approximate division in generated PTX.
+    #[kernel]
+    pub fn compile_div_approx(mut output: DisjointSlice<[f32; 2]>, a: f32, b: f32) {
+        let index = cuda_device::thread::index_1d();
+        if let Some(row) = output.get_mut(index) {
+            row[0] = raw_float::div_approx_ftz_f32(a, b);
+            row[1] = device_float::div_approx_ftz_f32(b, a);
+        }
+    }
+
     /// Keeps every explicit-rounding scalar arithmetic intrinsic in the module.
     ///
     /// This coverage kernel is compiled but not launched by the example.

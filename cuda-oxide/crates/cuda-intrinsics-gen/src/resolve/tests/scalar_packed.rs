@@ -9,10 +9,10 @@ use crate::model::{
     ImportedIntrinsic, IntrinsicBackend, IntrinsicSource, OverlayIntrinsic, OverlayShardFile,
     PackedAluFormat, PackedAluOperation, PackedConversionDestinationFormat,
     PackedConversionRounding, PackedConversionSaturation, PrmtMode, RuntimeValidation,
-    ScalarArithmeticAdmission, ScalarArithmeticFormat, ScalarArithmeticOperation,
-    ScalarArithmeticRounding, ScalarArithmeticSaturation, ScalarArithmeticSubnormal,
-    ScalarConversionAdmission, ScalarConversionRounding, ScalarConversionSaturation,
-    ScalarMathAdmission,
+    ScalarArithmeticAdmission, ScalarArithmeticFormat, ScalarArithmeticMode,
+    ScalarArithmeticOperation, ScalarArithmeticRounding, ScalarArithmeticSaturation,
+    ScalarArithmeticSubnormal, ScalarConversionAdmission, ScalarConversionRounding,
+    ScalarConversionSaturation, ScalarMathAdmission,
 };
 use crate::util::read_json;
 use std::collections::BTreeMap;
@@ -21,6 +21,7 @@ use std::path::Path;
 use super::fixtures::*;
 use crate::model::{ImportedSelection, ScalarConversionAdmissionVariant};
 use crate::resolve::driver::*;
+use crate::resolve::evidence::{IndexedEvidence, read_evidence_file, validate_evidence};
 use crate::resolve::families::*;
 use crate::resolve::guards::*;
 use crate::resolve::overlay::*;
@@ -750,7 +751,7 @@ fn scalar_arithmetic_admission_is_closed_and_selects_only_direct_ptx() {
                     abi_id: format!("i{:04}", 390 + index),
                     format: variant.0,
                     operation: variant.1,
-                    rounding: variant.2,
+                    mode: variant.2,
                     subnormal: variant.3,
                     saturation: variant.4,
                 },
@@ -758,11 +759,12 @@ fn scalar_arithmetic_admission_is_closed_and_selects_only_direct_ptx() {
             .collect(),
     };
     let records = expand_scalar_arithmetic_admission(&admission).unwrap();
-    assert_eq!(records.len(), 64);
+    assert_eq!(records.len(), 65);
     assert_eq!(records.first().unwrap().id, "mul_rn_f64");
     assert_eq!(records.first().unwrap().abi_id, "i0390");
-    assert_eq!(records.last().unwrap().id, "add_rp_ftz_sat_f32");
-    assert_eq!(records.last().unwrap().abi_id, "i0453");
+    assert_eq!(records[63].id, "add_rp_ftz_sat_f32");
+    assert_eq!(records[63].abi_id, "i0453");
+    assert_eq!(records[64].id, "div_approx_ftz_f32");
     validate_unique_overlay(&records, 1).unwrap();
     let llvm_inline_count = records
         .iter()
@@ -773,13 +775,12 @@ fn scalar_arithmetic_admission_is_closed_and_selects_only_direct_ptx() {
             })
         })
         .count();
-    assert_eq!(llvm_inline_count, 16);
+    assert_eq!(llvm_inline_count, 17);
     assert!(records.iter().all(|record| {
-        let expected = if record
-            .scalar_arithmetic
-            .as_ref()
-            .is_some_and(|arithmetic| arithmetic.saturation == ScalarArithmeticSaturation::Sat)
-        {
+        let expected = if record.scalar_arithmetic.as_ref().is_some_and(|arithmetic| {
+            arithmetic.saturation == ScalarArithmeticSaturation::Sat
+                || arithmetic.mode == ScalarArithmeticMode::Approximate
+        }) {
             BackendLoweringMechanism::InlinePtx
         } else {
             BackendLoweringMechanism::TypedNvvm
@@ -807,7 +808,10 @@ fn scalar_arithmetic_admission_is_closed_and_selects_only_direct_ptx() {
             .iter()
             .filter(|selection| selection_matches_policy(record, selection).unwrap())
             .collect::<Vec<_>>();
-        assert_eq!(selected.len(), 1, "{}", record.id);
+        let expected = usize::from(
+            record.scalar_arithmetic.as_ref().unwrap().mode != ScalarArithmeticMode::Approximate,
+        );
+        assert_eq!(selected.len(), expected, "{}", record.id);
         if declaration.selections.len() == 3 {
             mixed_count += 1;
         }
@@ -846,18 +850,69 @@ fn scalar_arithmetic_admission_is_closed_and_selects_only_direct_ptx() {
         expand_scalar_arithmetic_admission(&reordered)
             .unwrap_err()
             .to_string()
-            .contains("canonical 64 variants")
+            .contains("canonical variants")
     );
     assert!(
         scalar_arithmetic_recipe((
             ScalarArithmeticFormat::F64,
             ScalarArithmeticOperation::Fma,
-            ScalarArithmeticRounding::Rn,
+            ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rn),
             ScalarArithmeticSubnormal::Ftz,
             ScalarArithmeticSaturation::None,
         ))
         .is_none()
     );
+    assert!(
+        scalar_arithmetic_recipe((
+            ScalarArithmeticFormat::F32,
+            ScalarArithmeticOperation::Div,
+            ScalarArithmeticMode::Approximate,
+            ScalarArithmeticSubnormal::Preserve,
+            ScalarArithmeticSaturation::None,
+        ))
+        .is_none()
+    );
+}
+
+#[test]
+fn approximate_division_rejects_fabricated_typed_or_missing_terminal_evidence() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let base = load_resolution_base(&root).unwrap();
+    let policy = base
+        .overlay
+        .intrinsics
+        .iter()
+        .find(|p| p.id == "div_approx_ftz_f32")
+        .unwrap();
+    let lowering = policy
+        .backend_lowerings
+        .iter()
+        .find(|l| l.backend == IntrinsicBackend::LlvmNvptx)
+        .unwrap();
+    let mut file = read_evidence_file(
+        &root.join("intrinsics/evidence/rust-llvm-23.1.3-aab11ee0-scalar-arithmetic.json"),
+    )
+    .unwrap();
+    let index = file.records.iter().position(|r| r.id == policy.id).unwrap();
+    let check = |file: &crate::model::EvidenceFile| {
+        let indexed = IndexedEvidence {
+            file,
+            record: &file.records[index],
+            backend_version: &file.backend_version,
+            backend_sha256: &file.backend_sha256,
+        };
+        validate_evidence(policy, &indexed, Some(lowering))
+    };
+    check(&file).unwrap();
+    let mut fabricated = file.records[index].stages[0].clone();
+    fabricated.mechanism = Some(BackendLoweringMechanism::TypedNvvm);
+    file.records[index].stages.push(fabricated);
+    assert!(check(&file).is_err());
+    file.records[index].stages.pop();
+    file.records[index]
+        .stages
+        .retain(|s| s.stage != crate::model::EvidenceStageKind::PtxAssembly);
+    assert!(check(&file).is_err());
 }
 
 #[test]

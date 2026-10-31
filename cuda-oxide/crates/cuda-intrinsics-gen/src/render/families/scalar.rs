@@ -6,10 +6,10 @@
 use crate::model::{
     BackendLoweringMechanism, CatalogIntrinsic, ExtendedMinMaxFormat, ExtendedMinMaxNan,
     ExtendedMinMaxOperation, ExtendedMinMaxSubnormal, IntegerMinMaxFormat, IntegerMinMaxOperation,
-    IntrinsicBackend, ScalarArithmeticFormat, ScalarArithmeticOperation, ScalarArithmeticRounding,
-    ScalarArithmeticSaturation, ScalarArithmeticSubnormal, ScalarConversionRounding,
-    ScalarConversionSaturation, ScalarMathFormat, ScalarMathOperation, ScalarMathPrecision,
-    ScalarMathSubnormal,
+    IntrinsicBackend, ScalarArithmeticFormat, ScalarArithmeticMode, ScalarArithmeticOperation,
+    ScalarArithmeticRounding, ScalarArithmeticSaturation, ScalarArithmeticSubnormal,
+    ScalarConversionRounding, ScalarConversionSaturation, ScalarMathFormat, ScalarMathOperation,
+    ScalarMathPrecision, ScalarMathSubnormal,
 };
 
 pub(in crate::render) fn scalar_conversion_rounding_attr(
@@ -154,14 +154,21 @@ pub(in crate::render) fn scalar_arithmetic_operation_attr(
     }
 }
 
-pub(in crate::render) fn scalar_arithmetic_rounding_attr(
-    record: &CatalogIntrinsic,
-) -> &'static str {
-    match scalar_arithmetic_contract(record).rounding {
-        ScalarArithmeticRounding::Rn => "ScalarArithmeticRoundingAttr::Rn",
-        ScalarArithmeticRounding::Rz => "ScalarArithmeticRoundingAttr::Rz",
-        ScalarArithmeticRounding::Rm => "ScalarArithmeticRoundingAttr::Rm",
-        ScalarArithmeticRounding::Rp => "ScalarArithmeticRoundingAttr::Rp",
+pub(in crate::render) fn scalar_arithmetic_mode_attr(record: &CatalogIntrinsic) -> &'static str {
+    match scalar_arithmetic_contract(record).mode {
+        ScalarArithmeticMode::Approximate => "ScalarArithmeticModeAttr::Approx",
+        ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rn) => {
+            "ScalarArithmeticModeAttr::Rn"
+        }
+        ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rz) => {
+            "ScalarArithmeticModeAttr::Rz"
+        }
+        ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rm) => {
+            "ScalarArithmeticModeAttr::Rm"
+        }
+        ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rp) => {
+            "ScalarArithmeticModeAttr::Rp"
+        }
     }
 }
 

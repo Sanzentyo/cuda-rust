@@ -351,5 +351,84 @@
         "facts": {"llvm_arguments": ["f32", "f32"], "llvm_results": ["f32"]}
       }
     }
+  ],
+  "records": [{
+  "id": "div_approx_ftz_f32",
+  "source_record": "int_nvvm_div_approx_ftz_f",
+  "llvm_symbol": "llvm.nvvm.div.approx.ftz.f",
+  "llvm_arguments": [
+    "f32",
+    "f32"
+  ],
+  "llvm_results": [
+    "f32"
+  ],
+  "target_triple": "nvptx64-nvidia-cuda",
+  "gpu_target": "compute_80",
+  "ptx_feature": "PTX ISA 7.0 minimum; CUDA 13.3 emits PTX 9.3",
+  "status": "validated",
+  "runtime_validation": "unexecuted",
+  "expected_ptx": {
+    "mnemonic": "div",
+    "modifiers": [
+      "approx",
+      "ftz",
+      "f32"
+    ],
+    "operands": [
+      {
+        "kind": "register"
+      },
+      {
+        "kind": "register"
+      },
+      {
+        "kind": "register"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "targets": [
+        "compute_80",
+        "ptx93"
+      ],
+      "representation": "NVVM IR 2.0 inline PTX",
+      "stage": "backend_codegen",
+      "mechanism": "inline_ptx",
+      "outcome": "succeeded",
+      "detail": "IR SHA-256 2ded79b96eec88ea9e4c08623362aff66f4a4f385e1076bf195c4dca72a4ab34 produced PTX SHA-256 138ca82cc90d18f74df25c5ba09f81a84ec733315166773539d13799a9e5f4b5 and LTOIR SHA-256 111898426db67e1bc7b28587cce67b5a1d2c491b5f94d5d796bebd6b7d1288e9."
+    },
+    {
+      "targets": [
+        "sm_80",
+        "ptx93"
+      ],
+      "representation": "libNVVM PTX assembled",
+      "stage": "ptx_assembly",
+      "mechanism": "inline_ptx",
+      "outcome": "succeeded",
+      "artifact_kind": "cubin",
+      "detail": "Cubin SHA-256 26132b116316efbaf8a2b8be8d61227051bcc1e1701ded01d3d2e660ccaa5660.",
+      "tool_path": "ptxas",
+      "tool_version": "Cuda compilation tools, release 13.3, V13.3.33",
+      "tool_sha256": "7fdd01a4cf50e30746da98989c9272a907f491e6fd7fecfda14642e4375f88fb"
+    },
+    {
+      "targets": [
+        "sm_80",
+        "ptx93"
+      ],
+      "representation": "LTOIR linked to cubin",
+      "stage": "device_link",
+      "mechanism": "inline_ptx",
+      "outcome": "succeeded",
+      "artifact_kind": "cubin",
+      "detail": "Linked cubin SHA-256 3e4a06eab6319f8d75a890f4b2645d35d92125c79eaa2b63dba2e5383552d632.",
+      "tool_path": "libnvJitLink.so.13.3.33",
+      "tool_version": "nvJitLinkVersion 13.3; CUDA 13.3 V13.3.33",
+      "tool_sha256": "3ba1e744347cd68617b862eccfd98b125482e882b7a6319f42abc9a768513db8"
+    }
   ]
+} ]
 }

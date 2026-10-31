@@ -49,14 +49,14 @@ fn overlay_manifest_loads_sorted_family_shards() {
         read_overlay(&repo_root, &repo_root.join("intrinsics/overlay.toml")).unwrap();
     assert_eq!(overlay.schema, OVERLAY_SCHEMA);
     assert_eq!(overlay.shards.len(), 68);
-    assert_eq!(overlay.intrinsics.len(), 1042);
+    assert_eq!(overlay.intrinsics.len(), 1043);
     assert_eq!(
         overlay
             .intrinsics
             .iter()
             .filter(|record| record.family == "scalar_arithmetic")
             .count(),
-        64
+        65
     );
     assert_eq!(
         overlay

@@ -10,7 +10,7 @@ use dialect_nvvm::ops::{
     CpAsyncMbarrierArriveSharedOp, CpAsyncWaitGroupOp, MbarrierArriveNoCompleteSharedOp,
     MbarrierArriveSharedOp, MbarrierInitSharedOp, MbarrierInvalSharedOp, MbarrierTestWaitSharedOp,
     ReadPtxSregClusterIdxOp, ReadPtxSregNclusterIdOp, ScalarArithmeticFormatAttr,
-    ScalarArithmeticOp, ScalarArithmeticOperationAttr, ScalarArithmeticRoundingAttr,
+    ScalarArithmeticModeAttr, ScalarArithmeticOp, ScalarArithmeticOperationAttr,
     ScalarArithmeticSaturationAttr, ScalarArithmeticSubnormalAttr, ScalarConversionOp,
     ScalarConversionRoundingAttr, ScalarConversionSaturationAttr, Tcgen05AllocOp,
     Tcgen05CommitMulticastCg2Op, Tcgen05Ld16x32bx2X1RawOp, Tcgen05Ld16x256bPureOp, Tcgen05MmaF16Op,
@@ -331,7 +331,7 @@ fn generated_scalar_arithmetic_accepts_only_admitted_shapes_and_types() {
         vec![f32_value, f32_value],
         ScalarArithmeticFormatAttr::F32,
         ScalarArithmeticOperationAttr::Mul,
-        ScalarArithmeticRoundingAttr::Rn,
+        ScalarArithmeticModeAttr::Rn,
         ScalarArithmeticSubnormalAttr::Preserve,
         ScalarArithmeticSaturationAttr::None,
     );
@@ -342,7 +342,7 @@ fn generated_scalar_arithmetic_accepts_only_admitted_shapes_and_types() {
         vec![f64_value, f64_value, f64_value],
         ScalarArithmeticFormatAttr::F64,
         ScalarArithmeticOperationAttr::Fma,
-        ScalarArithmeticRoundingAttr::Rz,
+        ScalarArithmeticModeAttr::Rz,
         ScalarArithmeticSubnormalAttr::Preserve,
         ScalarArithmeticSaturationAttr::None,
     );
@@ -353,7 +353,7 @@ fn generated_scalar_arithmetic_accepts_only_admitted_shapes_and_types() {
         vec![f32_value, f32_value],
         ScalarArithmeticFormatAttr::F32,
         ScalarArithmeticOperationAttr::Add,
-        ScalarArithmeticRoundingAttr::Rp,
+        ScalarArithmeticModeAttr::Rp,
         ScalarArithmeticSubnormalAttr::Ftz,
         ScalarArithmeticSaturationAttr::Sat,
     );
@@ -364,7 +364,7 @@ fn generated_scalar_arithmetic_accepts_only_admitted_shapes_and_types() {
         vec![f64_value, f64_value],
         ScalarArithmeticFormatAttr::F64,
         ScalarArithmeticOperationAttr::Mul,
-        ScalarArithmeticRoundingAttr::Rn,
+        ScalarArithmeticModeAttr::Rn,
         ScalarArithmeticSubnormalAttr::Ftz,
         ScalarArithmeticSaturationAttr::None,
     );
@@ -375,7 +375,7 @@ fn generated_scalar_arithmetic_accepts_only_admitted_shapes_and_types() {
         vec![f32_value, f32_value],
         ScalarArithmeticFormatAttr::F32,
         ScalarArithmeticOperationAttr::Fma,
-        ScalarArithmeticRoundingAttr::Rn,
+        ScalarArithmeticModeAttr::Rn,
         ScalarArithmeticSubnormalAttr::Preserve,
         ScalarArithmeticSaturationAttr::None,
     );
@@ -386,7 +386,7 @@ fn generated_scalar_arithmetic_accepts_only_admitted_shapes_and_types() {
         vec![f32_value, f64_value],
         ScalarArithmeticFormatAttr::F32,
         ScalarArithmeticOperationAttr::Mul,
-        ScalarArithmeticRoundingAttr::Rn,
+        ScalarArithmeticModeAttr::Rn,
         ScalarArithmeticSubnormalAttr::Preserve,
         ScalarArithmeticSaturationAttr::None,
     );

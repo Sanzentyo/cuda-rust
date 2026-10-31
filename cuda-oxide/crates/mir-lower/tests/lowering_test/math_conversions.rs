@@ -1583,7 +1583,7 @@ fn lower_representative_scalar_arithmetic(
             operands,
             nvvm::ScalarArithmeticFormatAttr::F32,
             operation,
-            nvvm::ScalarArithmeticRoundingAttr::Rn,
+            nvvm::ScalarArithmeticModeAttr::Rn,
             nvvm::ScalarArithmeticSubnormalAttr::Preserve,
             saturation,
         )

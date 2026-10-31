@@ -7264,3 +7264,10 @@ status = "active"
 catalog_id = "fence_acquire_shared_cluster_cluster"
 operation_key = "fence.acquire.sync_restrict.shared_cluster.cluster"
 raw_rust_signature = { safe = false, arguments = [], result = "()" }
+
+[[entry]]
+abi_id = "i1043"
+status = "active"
+catalog_id = "div_approx_ftz_f32"
+operation_key = "scalar.arithmetic.div.approx.ftz.f32"
+raw_rust_signature = { safe = true, arguments = ["f32", "f32"], result = "f32" }

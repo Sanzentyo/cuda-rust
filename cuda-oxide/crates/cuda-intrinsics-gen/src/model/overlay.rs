@@ -13,7 +13,7 @@ use super::contracts::{
     Movmatrix, PackedAlu, PackedAtomic, PackedConversion, PackedConversionDestinationFormat,
     PackedConversionSaturation, Prmt, PrmtMode, Redux, RegisterMma, RegisterMmaAccumulator,
     RegisterMmaElement, RegisterMmaOperation, RegisterMmaOverflow, RegisterMmaShape,
-    ScalarArithmetic, ScalarArithmeticFormat, ScalarArithmeticOperation, ScalarArithmeticRounding,
+    ScalarArithmetic, ScalarArithmeticFormat, ScalarArithmeticMode, ScalarArithmeticOperation,
     ScalarArithmeticSaturation, ScalarArithmeticSubnormal, ScalarConversion,
     ScalarConversionRounding, ScalarConversionSaturation, ScalarMath, ScalarMathFormat,
     ScalarMathOperation, ScalarMathPrecision, ScalarMathSubnormal, SparseMma, SparseMmaAccumulator,
@@ -589,7 +589,7 @@ pub struct ScalarArithmeticAdmissionVariant {
     pub abi_id: String,
     pub format: ScalarArithmeticFormat,
     pub operation: ScalarArithmeticOperation,
-    pub rounding: ScalarArithmeticRounding,
+    pub mode: ScalarArithmeticMode,
     pub subnormal: ScalarArithmeticSubnormal,
     pub saturation: ScalarArithmeticSaturation,
 }

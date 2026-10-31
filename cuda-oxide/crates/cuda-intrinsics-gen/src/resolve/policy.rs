@@ -5,8 +5,8 @@
 
 use crate::model::{
     BackendLoweringMechanism, ClcOperation, CpAsyncSourceSize, ImportedIntrinsic, IntrinsicSource,
-    MbarrierExtendedOperation, OverlayIntrinsic, ScalarMathOperation, SpecialRegisterKind,
-    Tcgen05SourceContract, TmaOperation,
+    MbarrierExtendedOperation, OverlayIntrinsic, ScalarArithmeticMode, ScalarMathOperation,
+    SpecialRegisterKind, Tcgen05SourceContract, TmaOperation,
 };
 use anyhow::{Context, Result, bail, ensure};
 
@@ -464,6 +464,11 @@ pub(super) fn validate_policy(
                     tcgen05.source_contract
                         == Tcgen05SourceContract::LlvmCustomLoweringWithoutSelection
                 }))
+            || (policy.family == "scalar_arithmetic"
+                && policy
+                    .scalar_arithmetic
+                    .as_ref()
+                    .is_some_and(|a| a.mode == ScalarArithmeticMode::Approximate))
             || (policy.family == "scalar_math"
                 && policy.scalar_math.as_ref().is_some_and(|sm| {
                     // Tanh is absent here only because it is PTX-native (no
@@ -489,6 +494,14 @@ pub(super) fn validate_policy(
             }
         }
         let expected_selection_count = match policy.family.as_str() {
+            "scalar_arithmetic"
+                if policy
+                    .scalar_arithmetic
+                    .as_ref()
+                    .is_some_and(|a| a.mode == ScalarArithmeticMode::Approximate) =>
+            {
+                0
+            }
             "vote" | "warp_barrier" | "elect" => 2,
             "warp_match" => 4,
             "warp_shuffle" => 8,

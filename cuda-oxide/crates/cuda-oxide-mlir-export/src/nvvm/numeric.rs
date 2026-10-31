@@ -64,7 +64,7 @@ fn register_nvvm_numeric_common_pack(
     registry.register_operation::<CvtF16x2F32Op>(PackTranslation)?;
     registry.register_attribute::<ScalarArithmeticFormatAttr>(DropAttribute)?;
     registry.register_attribute::<ScalarArithmeticOperationAttr>(DropAttribute)?;
-    registry.register_attribute::<ScalarArithmeticRoundingAttr>(DropAttribute)?;
+    registry.register_attribute::<ScalarArithmeticModeAttr>(DropAttribute)?;
     registry.register_attribute::<ScalarArithmeticSubnormalAttr>(DropAttribute)?;
     registry.register_attribute::<ScalarArithmeticSaturationAttr>(DropAttribute)?;
     registry.register_operation::<ScalarArithmeticOp>(ArithmeticTranslation)?;
@@ -280,8 +280,8 @@ impl OperationTranslation for ArithmeticTranslation {
             != Some(&ScalarArithmeticFormatAttr::F32)
             || op.get_attr_nvvm_scalar_arithmetic_operation(ctx).as_deref()
                 != Some(&ScalarArithmeticOperationAttr::Fma)
-            || op.get_attr_nvvm_scalar_arithmetic_rounding(ctx).as_deref()
-                != Some(&ScalarArithmeticRoundingAttr::Rn)
+            || op.get_attr_nvvm_scalar_arithmetic_mode(ctx).as_deref()
+                != Some(&ScalarArithmeticModeAttr::Rn)
             || op
                 .get_attr_nvvm_scalar_arithmetic_saturation(ctx)
                 .as_deref()

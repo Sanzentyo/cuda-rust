@@ -148,7 +148,7 @@ pub enum PackedAluAdapter {
 pub struct ScalarArithmetic {
     pub format: ScalarArithmeticFormat,
     pub operation: ScalarArithmeticOperation,
-    pub rounding: ScalarArithmeticRounding,
+    pub mode: ScalarArithmeticMode,
     pub subnormal: ScalarArithmeticSubnormal,
     pub saturation: ScalarArithmeticSaturation,
     pub runtime_validation: RuntimeValidation,
@@ -177,6 +177,49 @@ pub enum ScalarArithmeticRounding {
     Rz,
     Rm,
     Rp,
+}
+
+/// Precision mode of a scalar arithmetic instruction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(from = "ScalarArithmeticModeToken", into = "ScalarArithmeticModeToken")]
+pub enum ScalarArithmeticMode {
+    Rounded(ScalarArithmeticRounding),
+    Approximate,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ScalarArithmeticModeToken {
+    Rn,
+    Rz,
+    Rm,
+    Rp,
+    Approx,
+}
+
+impl From<ScalarArithmeticModeToken> for ScalarArithmeticMode {
+    fn from(value: ScalarArithmeticModeToken) -> Self {
+        use ScalarArithmeticModeToken::*;
+        match value {
+            Rn => Self::Rounded(ScalarArithmeticRounding::Rn),
+            Rz => Self::Rounded(ScalarArithmeticRounding::Rz),
+            Rm => Self::Rounded(ScalarArithmeticRounding::Rm),
+            Rp => Self::Rounded(ScalarArithmeticRounding::Rp),
+            Approx => Self::Approximate,
+        }
+    }
+}
+
+impl From<ScalarArithmeticMode> for ScalarArithmeticModeToken {
+    fn from(value: ScalarArithmeticMode) -> Self {
+        match value {
+            ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rn) => Self::Rn,
+            ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rz) => Self::Rz,
+            ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rm) => Self::Rm,
+            ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rp) => Self::Rp,
+            ScalarArithmeticMode::Approximate => Self::Approx,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]

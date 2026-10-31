@@ -813,7 +813,7 @@ fn scalar_arithmetic_rendering_uses_one_closed_carrier() {
     let catalog = crate::resolve::resolve(&repo_root).unwrap();
     validate_renderable(&catalog).unwrap();
     let records = scalar_arithmetics(&catalog).collect::<Vec<_>>();
-    assert_eq!(records.len(), 64);
+    assert_eq!(records.len(), 65);
     assert!(records.iter().all(|record| {
         record.semantics.pure
             == (record.scalar_arithmetic.as_ref().unwrap().operation
@@ -826,14 +826,15 @@ fn scalar_arithmetic_rendering_uses_one_closed_carrier() {
         compatibility.contains("pub fn fma_rp_ftz_sat_f32(arg0: f32, arg1: f32, arg2: f32) -> f32")
     );
     assert!(compatibility.contains("pub fn add_rp_ftz_sat_f32(arg0: f32, arg1: f32) -> f32"));
-    assert_eq!(compatibility.matches("#[must_use]").count(), 113);
+    assert!(compatibility.contains("pub fn div_approx_ftz_f32(arg0: f32, arg1: f32) -> f32"));
+    assert_eq!(compatibility.matches("#[must_use]").count(), 114);
 
     let dialect = render_dialect_scalar_arithmetic(&catalog, "test-hash");
     assert_eq!(dialect.matches("pub struct ScalarArithmeticOp").count(), 1);
     for attr in [
         "ScalarArithmeticFormatAttr",
         "ScalarArithmeticOperationAttr",
-        "ScalarArithmeticRoundingAttr",
+        "ScalarArithmeticModeAttr",
         "ScalarArithmeticSubnormalAttr",
         "ScalarArithmeticSaturationAttr",
     ] {
@@ -846,7 +847,7 @@ fn scalar_arithmetic_rendering_uses_one_closed_carrier() {
     let importer = render_importer(&catalog, "test-hash");
     assert_eq!(
         importer.matches("ScalarArithmeticOp::build(ctx").count(),
-        64
+        65
     );
     assert!(importer.contains("cuda_device::float::fma_rp_ftz_sat_f32"));
     assert!(importer.contains("cuda_device::float::add_rp_ftz_sat_f32"));
@@ -862,6 +863,7 @@ fn scalar_arithmetic_rendering_uses_one_closed_carrier() {
     assert!(lowering.contains("fma.rp.ftz.sat.f32"));
     assert!(lowering.contains("llvm_nvvm_add_rn_d"));
     assert!(lowering.contains("add.rp.sat.ftz.f32"));
+    assert!(lowering.contains("div.approx.ftz.f32"));
     assert!(lowering.contains("recipe.0, recipe.1, recipe.2, recipe.3"));
 
     let targets = render_targets(&catalog, "test-hash");

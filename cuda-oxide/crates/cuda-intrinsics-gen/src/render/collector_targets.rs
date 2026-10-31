@@ -9,10 +9,11 @@ use crate::model::{
     IntrinsicBackend, LdmatrixElement, LdmatrixLayout, LdmatrixMultiplicity, LdmatrixShape,
     PackedAtomicFormat, PrmtMode, RegisterMmaAccumulator, RegisterMmaElement, RegisterMmaKind,
     RegisterMmaLayout, RegisterMmaOperation, RegisterMmaOverflow, RegisterMmaShape,
-    ScalarArithmeticFormat, ScalarArithmeticOperation, ScalarArithmeticRounding,
-    ScalarArithmeticSaturation, ScalarArithmeticSubnormal, ScalarConversionRounding,
-    ScalarConversionSaturation, SparseMmaAccumulator, SparseMmaElement, SparseMmaLayout,
-    SparseMmaMetadata, SparseMmaOverflow, SparseMmaSelector, SparseMmaShape, WgmmaControlMode,
+    ScalarArithmeticFormat, ScalarArithmeticMode, ScalarArithmeticOperation,
+    ScalarArithmeticRounding, ScalarArithmeticSaturation, ScalarArithmeticSubnormal,
+    ScalarConversionRounding, ScalarConversionSaturation, SparseMmaAccumulator, SparseMmaElement,
+    SparseMmaLayout, SparseMmaMetadata, SparseMmaOverflow, SparseMmaSelector, SparseMmaShape,
+    WgmmaControlMode,
 };
 use crate::render::common::{
     generated_hardware_target, intrinsic_marker, rust_header, uses_identifier,
@@ -300,11 +301,20 @@ pub(super) fn generated_intrinsic_variant(record: &CatalogIntrinsic) -> String {
             ScalarArithmeticOperation::Fma => "GeneratedScalarArithmeticOperation::Fma",
             ScalarArithmeticOperation::Add => "GeneratedScalarArithmeticOperation::Add",
         };
-        let rounding = match arithmetic.rounding {
-            ScalarArithmeticRounding::Rn => "GeneratedScalarArithmeticRounding::Rn",
-            ScalarArithmeticRounding::Rz => "GeneratedScalarArithmeticRounding::Rz",
-            ScalarArithmeticRounding::Rm => "GeneratedScalarArithmeticRounding::Rm",
-            ScalarArithmeticRounding::Rp => "GeneratedScalarArithmeticRounding::Rp",
+        let rounding = match arithmetic.mode {
+            ScalarArithmeticMode::Approximate => "GeneratedScalarArithmeticMode::Approx",
+            ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rn) => {
+                "GeneratedScalarArithmeticMode::Rn"
+            }
+            ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rz) => {
+                "GeneratedScalarArithmeticMode::Rz"
+            }
+            ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rm) => {
+                "GeneratedScalarArithmeticMode::Rm"
+            }
+            ScalarArithmeticMode::Rounded(ScalarArithmeticRounding::Rp) => {
+                "GeneratedScalarArithmeticMode::Rp"
+            }
         };
         let subnormal = match arithmetic.subnormal {
             ScalarArithmeticSubnormal::Preserve => "GeneratedScalarArithmeticSubnormal::Preserve",
@@ -315,7 +325,7 @@ pub(super) fn generated_intrinsic_variant(record: &CatalogIntrinsic) -> String {
             ScalarArithmeticSaturation::Sat => "GeneratedScalarArithmeticSaturation::Sat",
         };
         return format!(
-            "GeneratedIntrinsicVariant::ScalarArithmetic {{ format: {format}, operation: {operation}, rounding: {rounding}, subnormal: {subnormal}, saturation: {saturation} }}"
+            "GeneratedIntrinsicVariant::ScalarArithmetic {{ format: {format}, operation: {operation}, mode: {rounding}, subnormal: {subnormal}, saturation: {saturation} }}"
         );
     }
     if let Some(minmax) = &record.extended_minmax {
@@ -605,19 +615,19 @@ impl GeneratedIntrinsicTarget {
         replace_exact_render_fragment(
             &mut output,
             "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum GeneratedIntrinsicVariant {",
-            "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum GeneratedScalarArithmeticFormat { F32, F64 }\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum GeneratedScalarArithmeticOperation { Mul, Div, Fma, Add }\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum GeneratedScalarArithmeticRounding { Rn, Rz, Rm, Rp }\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum GeneratedScalarArithmeticSubnormal { Preserve, Ftz }\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum GeneratedScalarArithmeticSaturation { None, Sat }\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum GeneratedIntrinsicVariant {",
+            "#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum GeneratedScalarArithmeticFormat { F32, F64 }\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum GeneratedScalarArithmeticOperation { Mul, Div, Fma, Add }\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum GeneratedScalarArithmeticMode { Approx, Rn, Rz, Rm, Rp }\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum GeneratedScalarArithmeticSubnormal { Preserve, Ftz }\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum GeneratedScalarArithmeticSaturation { None, Sat }\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum GeneratedIntrinsicVariant {",
         );
         if wgmma_controls(catalog).next().is_some() {
             replace_exact_render_fragment(
                 &mut output,
                 "    WgmmaControl { mode: GeneratedWgmmaControlMode },\n}",
-                "    WgmmaControl { mode: GeneratedWgmmaControlMode },\n    ScalarArithmetic { format: GeneratedScalarArithmeticFormat, operation: GeneratedScalarArithmeticOperation, rounding: GeneratedScalarArithmeticRounding, subnormal: GeneratedScalarArithmeticSubnormal, saturation: GeneratedScalarArithmeticSaturation },\n}",
+                "    WgmmaControl { mode: GeneratedWgmmaControlMode },\n    ScalarArithmetic { format: GeneratedScalarArithmeticFormat, operation: GeneratedScalarArithmeticOperation, mode: GeneratedScalarArithmeticMode, subnormal: GeneratedScalarArithmeticSubnormal, saturation: GeneratedScalarArithmeticSaturation },\n}",
             );
         } else {
             replace_exact_render_fragment(
                 &mut output,
                 "    ScalarConversion { rounding: GeneratedScalarConversionRounding, saturation: GeneratedScalarConversionSaturation },\n}",
-                "    ScalarConversion { rounding: GeneratedScalarConversionRounding, saturation: GeneratedScalarConversionSaturation },\n    ScalarArithmetic { format: GeneratedScalarArithmeticFormat, operation: GeneratedScalarArithmeticOperation, rounding: GeneratedScalarArithmeticRounding, subnormal: GeneratedScalarArithmeticSubnormal, saturation: GeneratedScalarArithmeticSaturation },\n}",
+                "    ScalarConversion { rounding: GeneratedScalarConversionRounding, saturation: GeneratedScalarConversionSaturation },\n    ScalarArithmetic { format: GeneratedScalarArithmeticFormat, operation: GeneratedScalarArithmeticOperation, mode: GeneratedScalarArithmeticMode, subnormal: GeneratedScalarArithmeticSubnormal, saturation: GeneratedScalarArithmeticSaturation },\n}",
             );
         }
     }
@@ -843,7 +853,7 @@ impl GeneratedIntrinsicTarget {
         }
     }
     if scalar_arithmetics(catalog).next().is_some() {
-        let arithmetic_match = r#"        GeneratedIntrinsicVariant::ScalarArithmetic { format, operation: arithmetic_operation, rounding, subnormal, saturation } => {
+        let arithmetic_match = r#"        GeneratedIntrinsicVariant::ScalarArithmetic { format, operation: arithmetic_operation, mode, subnormal, saturation } => {
             let Some(op) = Operation::get_op::<ScalarArithmeticOp>(operation, ctx) else { return false; };
             let format_matches = match format {
                 GeneratedScalarArithmeticFormat::F32 => op.get_attr_nvvm_scalar_arithmetic_format(ctx).as_deref() == Some(&ScalarArithmeticFormatAttr::F32),
@@ -855,11 +865,12 @@ impl GeneratedIntrinsicTarget {
                 GeneratedScalarArithmeticOperation::Fma => op.get_attr_nvvm_scalar_arithmetic_operation(ctx).as_deref() == Some(&ScalarArithmeticOperationAttr::Fma),
                 GeneratedScalarArithmeticOperation::Add => op.get_attr_nvvm_scalar_arithmetic_operation(ctx).as_deref() == Some(&ScalarArithmeticOperationAttr::Add),
             };
-            let rounding_matches = match rounding {
-                GeneratedScalarArithmeticRounding::Rn => op.get_attr_nvvm_scalar_arithmetic_rounding(ctx).as_deref() == Some(&ScalarArithmeticRoundingAttr::Rn),
-                GeneratedScalarArithmeticRounding::Rz => op.get_attr_nvvm_scalar_arithmetic_rounding(ctx).as_deref() == Some(&ScalarArithmeticRoundingAttr::Rz),
-                GeneratedScalarArithmeticRounding::Rm => op.get_attr_nvvm_scalar_arithmetic_rounding(ctx).as_deref() == Some(&ScalarArithmeticRoundingAttr::Rm),
-                GeneratedScalarArithmeticRounding::Rp => op.get_attr_nvvm_scalar_arithmetic_rounding(ctx).as_deref() == Some(&ScalarArithmeticRoundingAttr::Rp),
+            let rounding_matches = match mode {
+                GeneratedScalarArithmeticMode::Approx => op.get_attr_nvvm_scalar_arithmetic_mode(ctx).as_deref() == Some(&ScalarArithmeticModeAttr::Approx),
+                GeneratedScalarArithmeticMode::Rn => op.get_attr_nvvm_scalar_arithmetic_mode(ctx).as_deref() == Some(&ScalarArithmeticModeAttr::Rn),
+                GeneratedScalarArithmeticMode::Rz => op.get_attr_nvvm_scalar_arithmetic_mode(ctx).as_deref() == Some(&ScalarArithmeticModeAttr::Rz),
+                GeneratedScalarArithmeticMode::Rm => op.get_attr_nvvm_scalar_arithmetic_mode(ctx).as_deref() == Some(&ScalarArithmeticModeAttr::Rm),
+                GeneratedScalarArithmeticMode::Rp => op.get_attr_nvvm_scalar_arithmetic_mode(ctx).as_deref() == Some(&ScalarArithmeticModeAttr::Rp),
             };
             let subnormal_matches = match subnormal {
                 GeneratedScalarArithmeticSubnormal::Preserve => op.get_attr_nvvm_scalar_arithmetic_subnormal(ctx).as_deref() == Some(&ScalarArithmeticSubnormalAttr::Preserve),
@@ -935,7 +946,7 @@ impl GeneratedIntrinsicTarget {
         replace_exact_render_fragment(
             &mut output,
             "SparseMmaSelectorAttr, SparseMmaShapeAttr",
-            "ScalarArithmeticFormatAttr, ScalarArithmeticOp, ScalarArithmeticOperationAttr, ScalarArithmeticRoundingAttr, ScalarArithmeticSaturationAttr, ScalarArithmeticSubnormalAttr, SparseMmaSelectorAttr, SparseMmaShapeAttr",
+            "ScalarArithmeticFormatAttr, ScalarArithmeticOp, ScalarArithmeticOperationAttr, ScalarArithmeticModeAttr, ScalarArithmeticSaturationAttr, ScalarArithmeticSubnormalAttr, SparseMmaSelectorAttr, SparseMmaShapeAttr",
         );
     }
     if extended_minmax(catalog).next().is_some() {
@@ -1082,7 +1093,7 @@ const TARGETS_TYPE_CANDIDATES: &[&str] = &[
     "GeneratedRegisterMmaShape",
     "GeneratedScalarArithmeticFormat",
     "GeneratedScalarArithmeticOperation",
-    "GeneratedScalarArithmeticRounding",
+    "GeneratedScalarArithmeticMode",
     "GeneratedScalarArithmeticSaturation",
     "GeneratedScalarArithmeticSubnormal",
     "GeneratedScalarConversionRounding",
